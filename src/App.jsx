@@ -144,7 +144,7 @@ function App() {
                   }
                 >
                   <ListItemText
-                    primary={p.name}
+                    primary={<span style={{ fontWeight: 'bold', fontSize: '1.1em' }}>{p.name || 'Sin nombre'}</span>}
                     secondary={
                       <>
                         {p.phone && <span>Tel: {p.phone}<br /></span>}
