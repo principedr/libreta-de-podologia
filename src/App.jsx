@@ -31,7 +31,7 @@ function App() {
   const [visits, setVisits] = useState([]);
   const [openPatientDialog, setOpenPatientDialog] = useState(false);
   const [openVisitDialog, setOpenVisitDialog] = useState(false);
-  const [newPatient, setNewPatient] = useState({ name: '', phone: '' });
+  const [newPatient, setNewPatient] = useState({ name: '', phone: '', address: '' });
   const [newVisit, setNewVisit] = useState({ patientId: '', date: '', notes: '' });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
@@ -65,7 +65,7 @@ function App() {
     const tx = db.transaction(STORE_PATIENTS, 'readwrite');
     const store = tx.objectStore(STORE_PATIENTS);
     await store.add(newPatient);
-    setNewPatient({ name: '', phone: '' });
+    setNewPatient({ name: '', phone: '', address: '' });
     setOpenPatientDialog(false);
     setSnackbar({ open: true, message: 'Paciente agregado', severity: 'success' });
     loadPatients();
@@ -143,7 +143,19 @@ function App() {
                     </Button>
                   }
                 >
-                  <ListItemText primary={p.name} secondary={p.phone} />
+                  <ListItemText
+                    primary={p.name}
+                    secondary={
+                      <>
+                        {p.phone && <span>Tel: {p.phone}<br /></span>}
+                        {p.address && (
+                          <span>
+                            Dirección: <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}`} target="_blank" rel="noopener noreferrer" style={{ color: '#1976d2', textDecoration: 'underline' }}>{p.address}</a>
+                          </span>
+                        )}
+                      </>
+                    }
+                  />
                 </ListItem>
               ))}
             </List>
@@ -196,6 +208,13 @@ function App() {
             fullWidth
             value={newPatient.phone}
             onChange={e => setNewPatient({ ...newPatient, phone: e.target.value })}
+          />
+          <TextField
+            margin="dense"
+            label="Dirección"
+            fullWidth
+            value={newPatient.address}
+            onChange={e => setNewPatient({ ...newPatient, address: e.target.value })}
           />
         </DialogContent>
         <DialogActions>
