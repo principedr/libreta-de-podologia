@@ -8,7 +8,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { openDB } from 'idb';
 
 const DB_NAME = 'podologia_agenda';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_PATIENTS = 'patients';
 const STORE_VISITS = 'visits';
 
@@ -20,6 +20,9 @@ async function getDB() {
       }
       if (!db.objectStoreNames.contains(STORE_VISITS)) {
         db.createObjectStore(STORE_VISITS, { keyPath: 'id', autoIncrement: true });
+      } else if (db.objectStoreNames.contains(STORE_VISITS)) {
+        // Migración: agregar campos de informe clínico si no existen
+        // IndexedDB no permite alterar stores, pero los objetos pueden tener más campos
       }
     },
   });
@@ -32,7 +35,10 @@ function App() {
   const [openPatientDialog, setOpenPatientDialog] = useState(false);
   const [openVisitDialog, setOpenVisitDialog] = useState(false);
   const [newPatient, setNewPatient] = useState({ name: '', phone: '', address: '' });
-  const [newVisit, setNewVisit] = useState({ patientId: '', date: '', notes: '' });
+  const [newVisit, setNewVisit] = useState({ patientId: '', date: '', notes: '', diagnostico: '', tratamiento: '', observaciones: '' });
+  const [openInformeDialog, setOpenInformeDialog] = useState(false);
+  const [selectedVisit, setSelectedVisit] = useState(null);
+  const [informe, setInforme] = useState({ diagnostico: '', tratamiento: '', observaciones: '' });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   React.useEffect(() => {
@@ -76,13 +82,28 @@ function App() {
       setSnackbar({ open: true, message: 'Paciente y fecha requeridos', severity: 'error' });
       return;
     }
-  const db = await getDB();
+    const db = await getDB();
     const tx = db.transaction(STORE_VISITS, 'readwrite');
     const store = tx.objectStore(STORE_VISITS);
-    await store.add(newVisit);
-    setNewVisit({ patientId: '', date: '', notes: '' });
+    await store.add({ ...newVisit, diagnostico: '', tratamiento: '', observaciones: '' });
+    setNewVisit({ patientId: '', date: '', notes: '', diagnostico: '', tratamiento: '', observaciones: '' });
     setOpenVisitDialog(false);
     setSnackbar({ open: true, message: 'Visita agendada', severity: 'success' });
+    loadVisits();
+  }
+
+  // Guardar informe clínico
+  async function handleSaveInforme() {
+    if (!selectedVisit) return;
+    const db = await getDB();
+    const tx = db.transaction(STORE_VISITS, 'readwrite');
+    const store = tx.objectStore(STORE_VISITS);
+    const updated = { ...selectedVisit, ...informe };
+    await store.put(updated);
+    setOpenInformeDialog(false);
+    setSnackbar({ open: true, message: 'Informe clínico guardado', severity: 'success' });
+    setSelectedVisit(null);
+    setInforme({ diagnostico: '', tratamiento: '', observaciones: '' });
     loadVisits();
   }
 
@@ -173,14 +194,38 @@ function App() {
                 return (
                   <ListItem key={v.id} divider
                     secondaryAction={
-                      <Button color="error" size="small" onClick={() => handleDeleteVisit(v.id)}>
-                        Eliminar
-                      </Button>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button color="primary" size="small" onClick={() => {
+                          setSelectedVisit(v);
+                          setInforme({
+                            diagnostico: v.diagnostico || '',
+                            tratamiento: v.tratamiento || '',
+                            observaciones: v.observaciones || ''
+                          });
+                          setOpenInformeDialog(true);
+                        }}>
+                          Informe
+                        </Button>
+                        <Button color="error" size="small" onClick={() => handleDeleteVisit(v.id)}>
+                          Eliminar
+                        </Button>
+                      </Box>
                     }
                   >
                     <ListItemText
                       primary={patient ? patient.name : 'Paciente eliminado'}
-                      secondary={`Fecha: ${v.date} ${v.notes ? ' | Notas: ' + v.notes : ''}`}
+                      secondary={
+                        <>
+                          {`Fecha: ${v.date} ${v.notes ? ' | Notas: ' + v.notes : ''}`}
+                          {(v.diagnostico || v.tratamiento || v.observaciones) && (
+                            <Box sx={{ mt: 1, fontSize: '0.95em', color: '#444' }}>
+                              <b>Diagnóstico:</b> {v.diagnostico || '-'}<br />
+                              <b>Tratamiento:</b> {v.tratamiento || '-'}<br />
+                              <b>Observaciones:</b> {v.observaciones || '-'}
+                            </Box>
+                          )}
+                        </>
+                      }
                     />
                   </ListItem>
                 );
@@ -272,6 +317,44 @@ function App() {
           </DialogActions>
         </Dialog>
       </LocalizationProvider>
+
+      {/* Diálogo para informe clínico */}
+      <Dialog open={openInformeDialog} onClose={() => setOpenInformeDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Informe Clínico</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Diagnóstico"
+            fullWidth
+            multiline
+            minRows={2}
+            value={informe.diagnostico}
+            onChange={e => setInforme({ ...informe, diagnostico: e.target.value })}
+            sx={{ mt: 1 }}
+          />
+          <TextField
+            label="Tratamiento"
+            fullWidth
+            multiline
+            minRows={2}
+            value={informe.tratamiento}
+            onChange={e => setInforme({ ...informe, tratamiento: e.target.value })}
+            sx={{ mt: 2 }}
+          />
+          <TextField
+            label="Observaciones"
+            fullWidth
+            multiline
+            minRows={2}
+            value={informe.observaciones}
+            onChange={e => setInforme({ ...informe, observaciones: e.target.value })}
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenInformeDialog(false)}>Cancelar</Button>
+          <Button onClick={handleSaveInforme} variant="contained">Guardar</Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={snackbar.open}
