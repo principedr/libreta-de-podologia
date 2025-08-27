@@ -194,7 +194,7 @@ function App() {
                 return (
                   <ListItem key={v.id} divider
                     secondaryAction={
-                      <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
                         <Button color="primary" size="small" onClick={() => {
                           setSelectedVisit(v);
                           setInforme({
